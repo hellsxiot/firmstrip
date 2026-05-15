@@ -32,9 +32,17 @@ int path_filter_add(path_filter_t *filter, const char *pattern);
 
 /*
  * Test whether the given path passes the filter.
- * Returns 1 if the path should be processed, 0 if it should be skipped.
+ * In FILTER_MODE_INCLUDE: returns 1 if any pattern matches, 0 otherwise.
+ * In FILTER_MODE_EXCLUDE: returns 0 if any pattern matches, 1 otherwise.
+ * If no patterns have been added, all paths pass (returns 1).
  */
 int path_filter_match(const path_filter_t *filter, const char *path);
+
+/*
+ * Remove all patterns from the filter, resetting it to an empty state.
+ * The filter mode is preserved. Frees memory for all stored patterns.
+ */
+void path_filter_clear(path_filter_t *filter);
 
 /*
  * Free all resources held by the filter.
