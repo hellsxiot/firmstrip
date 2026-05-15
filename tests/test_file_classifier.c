@@ -2,73 +2,86 @@
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
-
 #include "../src/file_classifier.h"
 
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define CHECK(cond, msg) do { \
-    tests_run++; \
-    if (cond) { tests_passed++; printf("  PASS: %s\n", msg); } \
-    else { printf("  FAIL: %s\n", msg); } \
-} while(0)
-
-static void test_elf_detection(void) {
-    printf("[elf detection]\n");
-    uint8_t elf_magic[] = { 0x7f, 'E', 'L', 'F', 0x02, 0x01 };
-    FileClassification c = classify_file("/bin/busybox", elf_magic, sizeof(elf_magic));
-    CHECK(c.type == FTYPE_ELF_BINARY, "ELF magic recognized");
-    CHECK(c.is_executable == 1, "ELF marked executable");
-    CHECK(c.is_sensitive == 0, "ELF not sensitive");
+static void test_extension_script(void) {
+    assert(classify_by_extension("run.sh") == FILE_TYPE_SCRIPT);
+    assert(classify_by_extension("helper.py") == FILE_TYPE_SCRIPT);
+    assert(classify_by_extension("main.pl") == FILE_TYPE_SCRIPT);
+    printf("PASS: extension script\n");
 }
 
-static void test_private_key_detection(void) {
-    printf("[private key detection]\n");
-    const uint8_t pem[] = "-----BEGIN RSA PRIVATE KEY-----\nMIIE...";
-    FileClassification c = classify_file("/etc/ssl/private/server.key", pem, sizeof(pem));
-    CHECK(c.type == FTYPE_PRIVATE_KEY, "PEM private key recognized");
-    CHECK(c.is_sensitive == 1, "private key marked sensitive");
+static void test_extension_config(void) {
+    assert(classify_by_extension("app.conf") == FILE_TYPE_CONFIG);
+    assert(classify_by_extension("settings.json") == FILE_TYPE_CONFIG);
+    assert(classify_by_extension("device.xml") == FILE_TYPE_CONFIG);
+    printf("PASS: extension config\n");
 }
 
-static void test_shell_script_by_path(void) {
-    printf("[shell script by path]\n");
-    const uint8_t shebang[] = "#!/bin/sh\necho hello\n";
-    FileClassification c = classify_file("/etc/init.d/rcS", shebang, sizeof(shebang));
-    CHECK(c.type == FTYPE_SHELL_SCRIPT, "shell script recognized by shebang");
-    CHECK(c.is_executable == 1, "shell script marked executable");
+static void test_extension_archive(void) {
+    assert(classify_by_extension("fw.tar") == FILE_TYPE_ARCHIVE);
+    assert(classify_by_extension("update.gz") == FILE_TYPE_ARCHIVE);
+    assert(classify_by_extension("pkg.zip") == FILE_TYPE_ARCHIVE);
+    printf("PASS: extension archive\n");
 }
 
-static void test_config_by_extension(void) {
-    printf("[config by extension]\n");
-    FileClassification c = classify_file("/etc/network/interfaces", NULL, 0);
-    CHECK(c.type == FTYPE_CONFIG || c.type == FTYPE_TEXT || c.type == FTYPE_UNKNOWN,
-          "config file returns reasonable type");
+static void test_extension_unknown(void) {
+    assert(classify_by_extension("noext") == FILE_TYPE_UNKNOWN);
+    assert(classify_by_extension(".weird") == FILE_TYPE_UNKNOWN);
+    printf("PASS: extension unknown\n");
 }
 
-static void test_unknown_fallback(void) {
-    printf("[unknown fallback]\n");
-    uint8_t random_bytes[] = { 0xDE, 0xAD, 0xBE, 0xEF };
-    FileClassification c = classify_file("/var/data.bin", random_bytes, sizeof(random_bytes));
-    CHECK(c.type == FTYPE_DATA || c.type == FTYPE_UNKNOWN, "binary data gets data/unknown type");
-    CHECK(c.is_sensitive == 0, "random data not flagged sensitive");
+static void test_magic_elf(void) {
+    uint8_t elf[] = {0x7f, 'E', 'L', 'F', 0x02, 0x01};
+    assert(classify_by_magic(elf, sizeof(elf)) == FILE_TYPE_BINARY);
+    printf("PASS: magic ELF\n");
+}
+
+static void test_magic_gzip(void) {
+    uint8_t gz[] = {0x1f, 0x8b, 0x08, 0x00};
+    assert(classify_by_magic(gz, sizeof(gz)) == FILE_TYPE_ARCHIVE);
+    printf("PASS: magic gzip\n");
+}
+
+static void test_magic_shebang(void) {
+    uint8_t sh[] = {'#', '!', '/', 'b', 'i', 'n'};
+    assert(classify_by_magic(sh, sizeof(sh)) == FILE_TYPE_SCRIPT);
+    printf("PASS: magic shebang\n");
+}
+
+static void test_classify_file_magic_wins(void) {
+    /* .conf extension but ELF magic — magic should win */
+    uint8_t elf[] = {0x7f, 'E', 'L', 'F', 0x00};
+    FileType t = classify_file("weird.conf", elf, sizeof(elf));
+    assert(t == FILE_TYPE_BINARY);
+    printf("PASS: classify_file magic wins\n");
+}
+
+static void test_classify_file_fallback(void) {
+    uint8_t plain[] = {0x00, 0x01, 0x02};
+    FileType t = classify_file("config.json", plain, sizeof(plain));
+    assert(t == FILE_TYPE_CONFIG);
+    printf("PASS: classify_file fallback to extension\n");
 }
 
 static void test_type_name(void) {
-    printf("[type name strings]\n");
-    CHECK(strcmp(file_type_name(FTYPE_ELF_BINARY), "elf-binary") == 0, "elf-binary name");
-    CHECK(strcmp(file_type_name(FTYPE_PRIVATE_KEY), "private-key") == 0, "private-key name");
-    CHECK(strcmp(file_type_name(FTYPE_UNKNOWN), "unknown") == 0, "unknown name");
+    assert(strcmp(file_type_name(FILE_TYPE_BINARY), "binary") == 0);
+    assert(strcmp(file_type_name(FILE_TYPE_SCRIPT), "script") == 0);
+    assert(strcmp(file_type_name(FILE_TYPE_UNKNOWN), "unknown") == 0);
+    printf("PASS: type names\n");
 }
 
 int main(void) {
-    printf("=== test_file_classifier ===\n");
-    test_elf_detection();
-    test_private_key_detection();
-    test_shell_script_by_path();
-    test_config_by_extension();
-    test_unknown_fallback();
+    test_extension_script();
+    test_extension_config();
+    test_extension_archive();
+    test_extension_unknown();
+    test_magic_elf();
+    test_magic_gzip();
+    test_magic_shebang();
+    test_classify_file_magic_wins();
+    test_classify_file_fallback();
     test_type_name();
-    printf("\nResults: %d/%d passed\n", tests_passed, tests_run);
-    return (tests_passed == tests_run) ? 0 : 1;
+    printf("All file_classifier tests passed.\n");
+    return 0;
 }
