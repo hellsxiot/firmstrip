@@ -38,6 +38,13 @@ const char *string_table_lookup(const StringTable *tbl, const char *str);
 size_t string_table_count(const StringTable *tbl);
 
 /*
+ * Remove a string from the table if it exists.
+ * Returns 1 if the string was found and removed, 0 if not found.
+ * Note: this does not shrink the underlying allocation.
+ */
+int string_table_remove(StringTable *tbl, const char *str);
+
+/*
  * Free all memory associated with the table.
  */
 void string_table_free(StringTable *tbl);
