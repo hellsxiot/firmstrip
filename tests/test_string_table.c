@@ -68,6 +68,23 @@ static void test_multiple_entries(void) {
     printf("  [PASS] multiple_entries\n");
 }
 
+/* Verify that interning and looking up an empty string works correctly. */
+static void test_intern_empty_string(void) {
+    StringTable tbl;
+    string_table_init(&tbl);
+
+    const char *s = string_table_intern(&tbl, "");
+    assert(s != NULL);
+    assert(strcmp(s, "") == 0);
+    assert(string_table_count(&tbl) == 1);
+
+    const char *r = string_table_lookup(&tbl, "");
+    assert(r == s); /* same pointer as interned */
+
+    string_table_free(&tbl);
+    printf("  [PASS] intern_empty_string\n");
+}
+
 int main(void) {
     printf("Running string_table tests...\n");
     test_init_and_free();
@@ -75,6 +92,7 @@ int main(void) {
     test_intern_deduplicates();
     test_lookup_missing();
     test_multiple_entries();
+    test_intern_empty_string();
     printf("All string_table tests passed.\n");
     return 0;
 }
