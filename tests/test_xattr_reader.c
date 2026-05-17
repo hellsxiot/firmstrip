@@ -69,6 +69,17 @@ static void test_xattr_read_nonexistent(void) {
     printf("PASS test_xattr_read_nonexistent\n");
 }
 
+/* verify that value_len matches the actual string length stored in value */
+static void test_xattr_value_len_consistent(void) {
+    XAttrList list;
+    fill_fake_list(&list);
+    for (int i = 0; i < list.count; i++) {
+        size_t slen = strlen(list.entries[i].value);
+        assert((size_t)list.entries[i].value_len == slen);
+    }
+    printf("PASS test_xattr_value_len_consistent\n");
+}
+
 int main(void) {
     test_xattr_find_existing();
     test_xattr_find_missing();
@@ -76,6 +87,7 @@ int main(void) {
     test_xattr_has_security_false();
     test_xattr_null_safety();
     test_xattr_read_nonexistent();
+    test_xattr_value_len_consistent();
     printf("All xattr_reader tests passed.\n");
     return 0;
 }
