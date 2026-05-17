@@ -1,61 +1,39 @@
-/*
- * owner_info.h - UID/GID ownership tracking for firmware files
- */
-
 #ifndef OWNER_INFO_H
 #define OWNER_INFO_H
 
 #include <sys/types.h>
-#include <stdint.h>
 
-/* Entry representing a single file's ownership */
-typedef struct {
-    char   *path;
-    uid_t   uid;
-    gid_t   gid;
-} OwnerEntry;
+#define OWNER_NAME_MAX 64
 
-/* Collection of ownership entries */
+/**
+ * Holds ownership and permission metadata for a single filesystem entry.
+ */
 typedef struct {
-    OwnerEntry *entries;
-    size_t      count;
-    size_t      capacity;
+    uid_t uid;
+    gid_t gid;
+    char  username[OWNER_NAME_MAX];
+    char  groupname[OWNER_NAME_MAX];
+    int   is_root_owned;
+    int   is_world_writable;
+    int   is_setuid;
+    int   is_setgid;
 } OwnerInfo;
 
-/*
- * Allocate a new OwnerInfo collector.
- * Returns NULL on allocation failure.
+/**
+ * Populate an OwnerInfo struct by stat-ing the given path.
+ * Returns 0 on success, -1 on error.
  */
-OwnerInfo *owner_info_create(void);
+int owner_info_get(const char *path, OwnerInfo *out);
 
-/*
- * Add a file path with its uid/gid to the collector.
- * Returns 0 on success, -1 on failure.
+/**
+ * Returns 1 if the entry has any suspicious flags
+ * (world-writable, setuid, or setgid), 0 otherwise.
  */
-int owner_info_add(OwnerInfo *oi, const char *path, uid_t uid, gid_t gid);
+int owner_info_is_suspicious(const OwnerInfo *info);
 
-/*
- * Find entries matching a specific uid.
- * Caller must free the returned array (not the entries inside).
- * Returns NULL if none found; sets *out_count.
+/**
+ * Print a single-line summary of the owner info for the given path.
  */
-OwnerEntry **owner_info_find_by_uid(const OwnerInfo *oi, uid_t uid, size_t *out_count);
-
-/*
- * Find entries matching a specific gid.
- * Caller must free the returned array (not the entries inside).
- * Returns NULL if none found; sets *out_count.
- */
-OwnerEntry **owner_info_find_by_gid(const OwnerInfo *oi, gid_t gid, size_t *out_count);
-
-/*
- * Print a summary of ownership to stdout.
- */
-void owner_info_print(const OwnerInfo *oi);
-
-/*
- * Free all resources held by the collector.
- */
-void owner_info_free(OwnerInfo *oi);
+void owner_info_print(const OwnerInfo *info, const char *path);
 
 #endif /* OWNER_INFO_H */
